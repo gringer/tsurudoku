@@ -2,7 +2,8 @@
 
 library(shiny)
 
-shinyUI(fluidPage(
+shinyUI(
+  fluidPage(
   
   # Application title
   titlePanel("Tsurudoku"),
@@ -16,5 +17,12 @@ shinyUI(fluidPage(
       plotOutput("numberPlot", click = "num_click", height=80, width=400),
       plotOutput("sudokuPlot", hover = "grid_hover", click = "grid_click", height=400, width=400)
     )
+  ),
+  tags$script('
+    pressedKeyCount = 0;
+    $(document).on("keydown", function (e) {
+       Shiny.onInputChange("pressedKey", pressedKeyCount++);
+       Shiny.onInputChange("pressedKeyId", e.which);
+    });')
   )
-))
+)

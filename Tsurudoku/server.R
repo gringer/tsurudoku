@@ -20,6 +20,14 @@ shinyServer(function(input, output) {
   values$puzzle <- array(FALSE, c(9,9,9));
   values$locked <- array(FALSE, c(9,9));
   
+  flipNumber <- function(){
+    if(!any(values$click == c(-1,-1)) && # make sure the selected position is valid 
+       !values$locked[values$click[2],values$click[1]]){ # make sure the position is unlocked
+      values$puzzle[values$click[2],values$click[1],values$numClick] <-
+        xor(values$puzzle[values$click[2],values$click[1],values$numClick],TRUE);
+    }
+  }
+  
   ## Number display at top of screen
   output$numberPlot <- renderPlot({
     par(mar=c(0,0,0,0), lwd=3);
@@ -55,7 +63,7 @@ shinyServer(function(input, output) {
                         function(x){ifelse(length(which(x)) == 1, which(x), "")});
     text(x=rep(1:9+0.5, each=9), y=rep(1:9, 9)+0.5, textValues, 
          cex=c(1.5,1.75)[values$locked+1], 
-         col=c("#404040","#000000")[values$locked+1]);
+         col=c("#4040E0","#000000")[values$locked+1]);
 
     if(all(values$hover >= 0)){
       rect(xleft=values$hover[1], xright=values$hover[1]+1,
@@ -100,10 +108,7 @@ shinyServer(function(input, output) {
         values$numClick <- -1;
         values$numFade <- 0;
       } else {
-        if(!any(values$click == c(-1,-1))){
-          values$puzzle[values$click[2],values$click[1],values$numClick] <-
-            xor(values$puzzle[values$click[2],values$click[1],values$numClick],TRUE);
-        }
+        flipNumber();
       }
     }
   });
@@ -131,6 +136,13 @@ shinyServer(function(input, output) {
           values$puzzle[yi,xi,] = rep(FALSE,9);
         }
       }
+    }
+  });
+  
+  observeEvent(input$pressedKey, {
+    if(input$pressedKeyId >= 49 && input$pressedKeyId <= 57){ # numbers
+      values$numClick <- (input$pressedKeyId - 48);
+      flipNumber();
     }
   });
     
