@@ -5,24 +5,31 @@ library(shiny)
 shinyUI(
   fluidPage(
   
-  # Application title
-  titlePanel("Tsurudoku"),
-  sidebarLayout(
-    sidebarPanel(actionButton("lock", "Lock all"),
-                 actionButton("unlock", "Unlock all"),
-                 actionButton("clear", "Clear selected"),
-                 actionButton("reset", "Reset all")
+    # Application title
+    titlePanel("Tsurudoku"),
+    sidebarLayout(
+      sidebarPanel(actionButton("lock", "Lock all"),
+                   actionButton("unlock", "Unlock all"),
+                   actionButton("clear", "Clear selected"),
+                   actionButton("reset", "Reset all")
+      ),
+      mainPanel(
+        plotOutput("sudokuPlot", hover = hoverOpts("grid_hover", delay=100), 
+                   click = "grid_click", height=400, width=400),
+        plotOutput("numberPlot", click = "num_click", height=80, width=400)
+      )
     ),
-    mainPanel(
-      plotOutput("numberPlot", click = "num_click", height=80, width=400),
-      plotOutput("sudokuPlot", hover = "grid_hover", click = "grid_click", height=400, width=400)
-    )
-  ),
-  tags$script('
+    tags$script('
     pressedKeyCount = 0;
     $(document).on("keydown", function (e) {
        Shiny.onInputChange("pressedKey", pressedKeyCount++);
        Shiny.onInputChange("pressedKeyId", e.which);
+    });'),
+    tags$script('
+    pressedKeyCount = 0;
+    $(document).on("keyup", function (e) {
+       Shiny.onInputChange("releasedKey", pressedKeyCount++);
+       Shiny.onInputChange("releasedKeyId", e.which);
     });')
   )
-)
+);

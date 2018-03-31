@@ -10,12 +10,14 @@
 library(shiny)
 
 # Define server logic required to draw a histogram
-shinyServer(function(input, output) {
+shinyServer(function(input, output, session) {
   values <- reactiveValues();
   values$click <- c(-1,-1);
+  values$clickTimer <- 0;
   values$numClick <- -1;
   values$numFade <- 0;
   values$hover <- c(-1,-1);
+  values$hoverCell <- c(-1,-1);
   values$maxPos <- c(9,9);
   values$puzzle <- array(FALSE, c(9,9,9));
   values$locked <- array(FALSE, c(9,9));
@@ -28,13 +30,33 @@ shinyServer(function(input, output) {
     }
   }
   
+  setHover <- function(posX, posY){
+    values$hover <- floor(c(posX, posY));
+    hoverDelta <- (c(posX, posY) - values$hover) * 3;
+    values$hoverCell <- floor(hoverDelta) + 1;
+    if(any((values$hover > values$maxPos) | (values$hover < 1))){
+      values$hover <- c(-1,-1);
+      values$hoverCell <- c(-1,-1);
+    } else {
+      values$hoverCell[2] <- 4 - values$hoverCell[2];
+    }
+  }
+  
   ## Number display at top of screen
   output$numberPlot <- renderPlot({
     par(mar=c(0,0,0,0), lwd=3);
     plot(NA, xlim=c(0.5,10.5), ylim=c(0.5,2.5), ann=FALSE, axes=FALSE);
+    hoverNum <- (values$hoverCell[2]-1)*3 + values$hoverCell[1];
     segments(x0=(1:10), y0=1, y1=2);
     segments(x0=1, x1=10, y0=c(1,2));
-    text(x=1:9+0.5, y=1.5, labels=1:9, cex=2);
+    text(x=1:9+0.5, y=1.5, labels=1:9, cex=2, 
+         col = ifelse(1:9 == hoverNum, "#505000", "#000000"));
+    if(values$numFade > 0.01){
+      rect(xleft=values$numClick,
+           xright=values$numClick + 1,
+           ytop=2, 
+           ybottom=1, col = gray(0.1, values$numFade*0.75), border=NA);
+    }
   });
   
   ## Main sudoku grid
@@ -59,17 +81,23 @@ shinyServer(function(input, output) {
       }
     }
     
+    ## Show single choices
     textValues <- apply(values$puzzle,c(1,2), 
                         function(x){ifelse(length(which(x)) == 1, which(x), "")});
     text(x=rep(1:9+0.5, each=9), y=rep(1:9, 9)+0.5, textValues, 
          cex=c(1.5,1.75)[values$locked+1], 
          col=c("#4040E0","#000000")[values$locked+1]);
 
+    ## Show hover cell
     if(all(values$hover >= 0)){
-      rect(xleft=values$hover[1], xright=values$hover[1]+1,
-           ytop=values$hover[2], ybottom=values$hover[2]+1,
-           lwd = 3, col = "#80808060", border=NA);
+      rect(xleft=values$hover[1] + boxPos[values$hoverCell[1]] - 0.1,
+           xright=values$hover[1] + boxPos[values$hoverCell[1]] + 0.1,
+           ytop=values$hover[2] + boxPos[4-values$hoverCell[2]] - 0.1, 
+           ybottom=values$hover[2] + boxPos[4-values$hoverCell[2]] + 0.1,
+           lwd = 3, col = "#A0A02090", border=NA);
     }
+    
+    ## Show selected cell
     if(all(values$click >= 0)){
       rect(xleft=values$click[1], xright=values$click[1]+1,
            ytop=values$click[2], ybottom=values$click[2]+1,
@@ -81,35 +109,40 @@ shinyServer(function(input, output) {
   observeEvent(!is.null(input$grid_hover$x) && floor(c(input$grid_hover$x, input$grid_hover$y)), {
     if(is.null(input$grid_hover$x)){
     } else {
-      values$hover <- floor(c(input$grid_hover$x, input$grid_hover$y));
-      if(any((values$hover > values$maxPos) | (values$hover < 1))){
-        values$hover <- c(-1,-1);
-      }
+      setHover(input$grid_hover$x, input$grid_hover$y);
     }
   });
 
-  observeEvent(!is.null(input$grid_click$x) && floor(c(input$grid_click$x, input$grid_click$y)), {
+  ## Clicking on a cell in the grid
+  
+  observeEvent(c(input$grid_click$x, input$grid_click$y), {
     if(is.null(input$grid_click$x)){
+      values$clickTimer <- 0;
     } else {
       values$click <- floor(c(input$grid_click$x, input$grid_click$y));
+      values$clickTimer <- 1000;
       if(any((values$click > values$maxPos) | (values$click < 1))){
         values$click <- c(-1,-1);
+      } else {
+        setHover(input$grid_click$x, input$grid_click$y);
       }
-      values$hover <- values$click;
     }
   });
+  
+  ## Clicking on a number
   
   observeEvent(!is.null(input$num_click$x) && floor(input$num_click$x), {
     if(is.null(input$num_click$x)){
     } else {
       values$numClick <- floor(input$num_click$x);
-      values$numFade <- 10;
       if(any((values$numClick > values$maxPos) | (values$numClick < 1))){
         values$numClick <- -1;
         values$numFade <- 0;
       } else {
         flipNumber();
       }
+      values$hover <- c(-1,-1);
+      values$hoverCell <- c(-1,-1);
     }
   });
   
@@ -139,11 +172,38 @@ shinyServer(function(input, output) {
     }
   });
   
+  ## Key presses
+  
   observeEvent(input$pressedKey, {
     if(input$pressedKeyId >= 49 && input$pressedKeyId <= 57){ # numbers
       values$numClick <- (input$pressedKeyId - 48);
+      values$numFade <- 1.1;
       flipNumber();
     }
+    if(input$pressedKeyId >= 37 && input$pressedKeyId <= 40){ # arrow keys
+      arrowCode <- input$pressedKeyId - 37;
+      xInc <- ((arrowCode+1) %% 2) * (arrowCode - 1);
+      yInc <- ((arrowCode) %% 2) * (arrowCode - 2) * -1;
+      if(!any(values$click == c(-1,-1))){
+        values$click <- (((values$click - 1) + c(xInc, yInc) + 9) %% 9) + 1;
+      }
+    }
+    values$hover <- c(-1,-1);
+    values$hoverCell <- -1;
   });
+
+  observeEvent(input$releasedKey, {
+    if(input$releasedKeyId >= 49 && input$releasedKeyId <= 57){ # numbers
+      values$numFade <- 0;
+    }
+  });
+  # ## Fade timers (causes memory leak)
+  # 
+  # observe({
+  #   isolate({values$numFade <- values$numFade - 0.5; values$numFade;})
+  #   if(values$numFade > 0.01){
+  #     invalidateLater(100, session);
+  #   }
+  # });
     
 })
