@@ -31,6 +31,11 @@ shinyServer(function(input, output, session) {
     if(any(apply(singleChoices, 2, function(x){suppressWarnings(max(table(x)) > 1)}))){
       validPuzzle <- FALSE;
     }
+    if(any(sapply(0:8, function(x){
+      suppressWarnings(max(table(singleChoices[(x/3):(x/3+2), (x %% 3):(x %% 3 + 2)])) > 1)
+    }))){
+      validPuzzle <- FALSE;
+    }
     return(validPuzzle);
   }
   
