@@ -20,6 +20,19 @@ shinyServer(function(input, output, session) {
   values$maxPos <- c(9,9);
   values$puzzle <- array(FALSE, c(9,9,9));
   values$locked <- array(FALSE, c(9,9));
+
+  checkValid <- function(checkPuzzle){
+    validPuzzle <- TRUE;
+    singleChoices <- apply(checkPuzzle,c(1,2),
+                        function(x){ifelse(length(which(x)) == 1, which(x), NA)});
+    if(any(apply(singleChoices, 1, function(x){suppressWarnings(max(table(x)) > 1)}))){
+      validPuzzle <- FALSE;
+    }
+    if(any(apply(singleChoices, 2, function(x){suppressWarnings(max(table(x)) > 1)}))){
+      validPuzzle <- FALSE;
+    }
+    return(validPuzzle);
+  }
   
   flipNumber <- function(){
     if(!any(values$click == c(-1,-1)) && # make sure the selected position is valid 
@@ -104,6 +117,11 @@ shinyServer(function(input, output, session) {
       rect(xleft=values$click[1], xright=values$click[1]+1,
            ytop=values$click[2], ybottom=values$click[2]+1,
            lwd = 5, border = "#0000FF60");
+    }
+    
+    if(!checkValid(values$puzzle)){
+      rect(xleft = 1, xright = 10, ytop=10, ybottom=1,
+           col = "#A0600060", border=NA);
     }
     
   });
@@ -210,7 +228,7 @@ shinyServer(function(input, output, session) {
   observe({
     m <- isolate(values$numFade);
     if(m>0.01){
-      values$numFade <- max(m - 0.1, 0);
+      values$numFade <- max(m - 0.5, 0);
       invalidateLater(100, session);
     }
     values$numFade;
