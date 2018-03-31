@@ -13,7 +13,6 @@ library(shiny)
 shinyServer(function(input, output, session) {
   values <- reactiveValues();
   values$click <- c(-1,-1);
-  values$clickTimer <- 0;
   values$numClick <- -1;
   values$numFade <- 0;
   values$hover <- c(-1,-1);
@@ -31,6 +30,7 @@ shinyServer(function(input, output, session) {
   }
   
   setHover <- function(posX, posY){
+    values$clickTimer <- 0;
     values$hover <- floor(c(posX, posY));
     hoverDelta <- (c(posX, posY) - values$hover) * 3;
     values$hoverCell <- floor(hoverDelta) + 1;
@@ -50,7 +50,9 @@ shinyServer(function(input, output, session) {
     segments(x0=(1:10), y0=1, y1=2);
     segments(x0=1, x1=10, y0=c(1,2));
     text(x=1:9+0.5, y=1.5, labels=1:9, cex=2, 
-         col = ifelse(1:9 == hoverNum, "#505000", "#000000"));
+         col = ifelse(1:9 == hoverNum, 
+                      rgb(0.4*(values$clickTimer),0.4*(values$clickTimer),0), 
+                      "#000000"));
     if(values$numFade > 0.01){
       rect(xleft=values$numClick,
            xright=values$numClick + 1,
@@ -89,7 +91,7 @@ shinyServer(function(input, output, session) {
          col=c("#4040E0","#000000")[values$locked+1]);
 
     ## Show hover cell
-    if(all(values$hover >= 0)){
+    if(all(values$hover >= 0) && all(values$hover == values$click)){
       rect(xleft=values$hover[1] + boxPos[values$hoverCell[1]] - 0.1,
            xright=values$hover[1] + boxPos[values$hoverCell[1]] + 0.1,
            ytop=values$hover[2] + boxPos[4-values$hoverCell[2]] - 0.1, 
@@ -117,14 +119,20 @@ shinyServer(function(input, output, session) {
   
   observeEvent(c(input$grid_click$x, input$grid_click$y), {
     if(is.null(input$grid_click$x)){
-      values$clickTimer <- 0;
     } else {
-      values$click <- floor(c(input$grid_click$x, input$grid_click$y));
-      values$clickTimer <- 1000;
-      if(any((values$click > values$maxPos) | (values$click < 1))){
-        values$click <- c(-1,-1);
+      newClick <- floor(c(input$grid_click$x, input$grid_click$y));
+      if(all(newClick == values$click)){
+        hoverNum <- (values$hoverCell[2]-1)*3 + values$hoverCell[1];
+        values$numClick <- hoverNum;
+        values$numFade <- 1.1;
+        flipNumber();
       } else {
-        setHover(input$grid_click$x, input$grid_click$y);
+        values$click <- newClick;
+        if(any((values$click > values$maxPos) | (values$click < 1))){
+          values$click <- c(-1,-1);
+        } else {
+          setHover(input$grid_click$x, input$grid_click$y);
+        }
       }
     }
   });
@@ -199,11 +207,13 @@ shinyServer(function(input, output, session) {
   });
   # ## Fade timers (causes memory leak)
   # 
-  # observe({
-  #   isolate({values$numFade <- values$numFade - 0.5; values$numFade;})
-  #   if(values$numFade > 0.01){
-  #     invalidateLater(100, session);
-  #   }
-  # });
-    
+  observe({
+    m <- isolate(values$numFade);
+    if(m>0.01){
+      values$numFade <- max(m - 0.1, 0);
+      invalidateLater(100, session);
+    }
+    values$numFade;
+  });
+
 })
