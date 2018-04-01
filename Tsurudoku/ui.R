@@ -11,7 +11,8 @@ shinyUI(
       sidebarPanel(actionButton("lock", "Lock all"),
                    actionButton("unlock", "Unlock all"),
                    actionButton("clear", "Clear selected"),
-                   actionButton("reset", "Reset all")
+                   actionButton("reset", "Reset all"),
+                   downloadButton("sudokugrid.pdf", label="Make PDF")
       ),
       mainPanel(
         plotOutput("sudokuPlot", hover = hoverOpts("grid_hover", delay=100), 

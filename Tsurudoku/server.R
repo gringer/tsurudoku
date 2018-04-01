@@ -32,7 +32,8 @@ shinyServer(function(input, output, session) {
       validPuzzle <- FALSE;
     }
     if(any(sapply(0:8, function(x){
-      suppressWarnings(max(table(singleChoices[(x/3):(x/3+2), (x %% 3):(x %% 3 + 2)])) > 1)
+      suppressWarnings(max(table(singleChoices[(floor(x/3)*3):(floor(x/3)*3+2)+1, 
+                                               ((x %% 3)*3):((x %% 3)*3 + 2)+1])) > 1);
     }))){
       validPuzzle <- FALSE;
     }
@@ -60,6 +61,53 @@ shinyServer(function(input, output, session) {
     }
   }
   
+  makeGridPlot <- function(){
+    par(mar=c(0,0,0,0));
+    plot(NA, xlim=c(0.5,10.5), ylim=c(0.5,10.5), ann=FALSE, axes=FALSE);
+    segments(x0=1, x1=10, y0=(1:10));
+    segments(x0=(1:10), y0=1, y1=10);
+    segments(x0=1, x1=10, y0=seq(1, 10, length.out=4), lwd=3);
+    segments(x0=seq(1, 10, length.out=4), y0=1, y1=10, lwd=3);
+    ## choices
+    boxPos = seq(0.2,0.8,length.out=3);
+    for(yi in 1:9){
+      for(xi in 1:9){
+        if(length(which(values$puzzle[yi,xi,])) > 1){
+          rect(xleft = rep(boxPos,3)-0.1+xi, xright=rep(boxPos,3)+0.1+xi,
+               ytop = rep(rev(boxPos),each=3)-0.1+yi, ybottom=rep(rev(boxPos),each=3)+0.1+yi,
+               border = NA, col = c(NA,"#0000FF")[values$puzzle[yi,xi,]+1]);
+        }
+      }
+    }
+    ## Show single choices
+    textValues <- apply(values$puzzle,c(1,2), 
+                        function(x){ifelse(length(which(x)) == 1, which(x), "")});
+    text(x=rep(1:9+0.5, each=9), y=rep(1:9, 9)+0.5, textValues, 
+         cex=c(1.5,1.75)[values$locked+1], 
+         col=c("#4040E0","#000000")[values$locked+1]);
+    
+    ## Show hover cell
+    if(all(values$hover >= 0) && all(values$hover == values$click)){
+      rect(xleft=values$hover[1] + boxPos[values$hoverCell[1]] - 0.1,
+           xright=values$hover[1] + boxPos[values$hoverCell[1]] + 0.1,
+           ytop=values$hover[2] + boxPos[4-values$hoverCell[2]] - 0.1, 
+           ybottom=values$hover[2] + boxPos[4-values$hoverCell[2]] + 0.1,
+           lwd = 3, col = "#A0A02090", border=NA);
+    }
+    
+    ## Show selected cell
+    if(all(values$click >= 0)){
+      rect(xleft=values$click[1], xright=values$click[1]+1,
+           ytop=values$click[2], ybottom=values$click[2]+1,
+           lwd = 5, border = "#0000FF60");
+    }
+    
+    if(!checkValid(values$puzzle)){
+      rect(xleft = 1, xright = 10, ytop=10, ybottom=1,
+           col = "#A0600060", border=NA);
+    }
+  }
+  
   ## Number display at top of screen
   output$numberPlot <- renderPlot({
     par(mar=c(0,0,0,0), lwd=3);
@@ -81,56 +129,24 @@ shinyServer(function(input, output, session) {
   
   ## Main sudoku grid
   output$sudokuPlot <- renderPlot({
-    
-    par(mar=c(0,0,0,0));
-    plot(NA, xlim=c(0.5,10.5), ylim=c(0.5,10.5), ann=FALSE, axes=FALSE);
-    segments(x0=1, x1=10, y0=(1:10));
-    segments(x0=(1:10), y0=1, y1=10);
-    segments(x0=1, x1=10, y0=seq(1, 10, length.out=4), lwd=3);
-    segments(x0=seq(1, 10, length.out=4), y0=1, y1=10, lwd=3);
-    
-    ## choices
-    boxPos = seq(0.2,0.8,length.out=3);
-    for(yi in 1:9){
-      for(xi in 1:9){
-        if(length(which(values$puzzle[yi,xi,])) > 1){
-          rect(xleft = rep(boxPos,3)-0.1+xi, xright=rep(boxPos,3)+0.1+xi,
-               ytop = rep(rev(boxPos),each=3)-0.1+yi, ybottom=rep(rev(boxPos),each=3)+0.1+yi,
-               border = NA, col = c(NA,"#0000FF")[values$puzzle[yi,xi,]+1]);
-        }
-      }
-    }
-    
-    ## Show single choices
-    textValues <- apply(values$puzzle,c(1,2), 
-                        function(x){ifelse(length(which(x)) == 1, which(x), "")});
-    text(x=rep(1:9+0.5, each=9), y=rep(1:9, 9)+0.5, textValues, 
-         cex=c(1.5,1.75)[values$locked+1], 
-         col=c("#4040E0","#000000")[values$locked+1]);
-
-    ## Show hover cell
-    if(all(values$hover >= 0) && all(values$hover == values$click)){
-      rect(xleft=values$hover[1] + boxPos[values$hoverCell[1]] - 0.1,
-           xright=values$hover[1] + boxPos[values$hoverCell[1]] + 0.1,
-           ytop=values$hover[2] + boxPos[4-values$hoverCell[2]] - 0.1, 
-           ybottom=values$hover[2] + boxPos[4-values$hoverCell[2]] + 0.1,
-           lwd = 3, col = "#A0A02090", border=NA);
-    }
-    
-    ## Show selected cell
-    if(all(values$click >= 0)){
-      rect(xleft=values$click[1], xright=values$click[1]+1,
-           ytop=values$click[2], ybottom=values$click[2]+1,
-           lwd = 5, border = "#0000FF60");
-    }
-    
-    if(!checkValid(values$puzzle)){
-      rect(xleft = 1, xright = 10, ytop=10, ybottom=1,
-           col = "#A0600060", border=NA);
-    }
-    
+    makeGridPlot();
   });
   
+  ## create PDF version of Sudoku grid
+  output$sudokugrid.pdf <- downloadHandler(
+    filename = function(){
+      fName <- sprintf("tsurudoku_%s.pdf",
+                       format(Sys.Date(),"%Y-%b-%d"));
+      return(fName);
+    },
+    content = function(con){
+      pdf(con);
+      makeGridPlot();
+      invisible(dev.off());
+    },
+    contentType = "text/pdf"
+  );
+
   observeEvent(!is.null(input$grid_hover$x) && floor(c(input$grid_hover$x, input$grid_hover$y)), {
     if(is.null(input$grid_hover$x)){
     } else {
