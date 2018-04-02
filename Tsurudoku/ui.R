@@ -12,6 +12,7 @@ shinyUI(
                    actionButton("unlock", "Unlock all"),
                    actionButton("clear", "Clear selected"),
                    actionButton("reset", "Reset all"),
+                   actionButton("undo", "Undo"),
                    downloadButton("sudokugrid.txt", "Save puzzle"),
                    fileInput("sudoku_input.txt", label=NULL, buttonLabel="Load puzzle", 
                              accept = c("text/plain",".txt")),

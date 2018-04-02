@@ -12,7 +12,7 @@ shinyServer(function(input, output, session) {
   values$puzzle <- array(FALSE, c(9,9,9));
   values$locked <- array(FALSE, c(9,9));
   values$puzzleHeader <- "## tsurudoku file format v1.0";
-  values$puzzleBuffer <- "## tsurudoku file format v1.0";
+  values$puzzleBuffer <- c("## tsurudoku file format v1.0", "## Additional changes");
 
   checkValid <- function(checkPuzzle){
     validPuzzle <- TRUE;
@@ -122,6 +122,23 @@ shinyServer(function(input, output, session) {
         }
       }
     }
+  }
+  
+  unlockBoard <- function(){
+    ## Unlock board, preserving the order of existing unlocked changes
+    changeBuffer <- values$puzzleBuffer[-(1:grep("^## Additional changes", values$puzzleBuffer))];
+    values$puzzleBuffer <- c(values$puzzleHeader, "## Additional changes");
+    for(yi in 1:9){
+      for(xi in 1:9){
+        if(values$locked[yi, xi]){
+          puzzleString <- sprintf("%d,%d %d",
+                                  xi, yi, which(values$puzzle[yi,xi,]));
+          values$puzzleBuffer <- c(values$puzzleBuffer, puzzleString);
+        }
+      }
+    }
+    values$puzzleBuffer <- c(values$puzzleBuffer, changeBuffer);
+    values$locked <- array(FALSE, c(9,9));
   }
   
   loadBoard <- function(resultData){
@@ -338,11 +355,7 @@ shinyServer(function(input, output, session) {
   });
 
   observeEvent(input$unlock, {
-    for(yi in 1:9){
-      for(xi in 1:9){
-        values$locked[yi,xi] <- FALSE;
-      }
-    }
+    unlockBoard();
   });
 
   observeEvent(input$clear, {
@@ -357,6 +370,10 @@ shinyServer(function(input, output, session) {
         }
       }
     }
+  });
+  
+  observeEvent(input$undo, {
+    undoMove();
   });
   
   observeEvent(input$sudoku_input.txt, {
