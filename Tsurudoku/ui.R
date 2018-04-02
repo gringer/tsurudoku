@@ -1,6 +1,6 @@
 # Tsurudoku -- a Shiny implementation of a sudoku puzzle generator / solver
 
-library(shiny)
+library(shiny);
 
 shinyUI(
   fluidPage(
@@ -8,15 +8,21 @@ shinyUI(
     # Application title
     titlePanel("Tsurudoku"),
     sidebarLayout(
-      sidebarPanel(actionButton("lock", "Lock all"),
-                   actionButton("unlock", "Unlock all"),
-                   actionButton("clear", "Clear selected"),
-                   actionButton("reset", "Reset all"),
-                   actionButton("undo", "Undo"),
-                   downloadButton("sudokugrid.txt", "Save puzzle"),
-                   fileInput("sudoku_input.txt", label=NULL, buttonLabel="Load puzzle", 
-                             accept = c("text/plain",".txt")),
-                   downloadButton("sudokugrid.pdf", label="Make PDF")
+      sidebarPanel(
+        actionButton("lock", "Lock all"),
+        actionButton("unlock", "Unlock all"),
+        actionButton("reset", "Reset all"),
+        actionButton("clear", "Clear selected"),
+        actionButton("undo", "Undo"),
+        downloadButton("sudokugrid.txt", "Save puzzle"),
+        downloadButton("sudokugrid.pdf", label="Make PDF"),
+        fileInput("sudoku_input.txt", label=NULL, buttonLabel="Load puzzle", 
+                  accept = c("text/plain",".txt")),
+        checkboxGroupInput("solveLevels", label = "Solve Levels",
+                           choices = list("line/line elimination")),
+        actionButton("solve", "Solve"),
+        actionButton("makePuzle", "Make Puzzle")
+          
       ),
       mainPanel(
         plotOutput("sudokuPlot", hover = hoverOpts("grid_hover", delay=100), 
@@ -37,4 +43,4 @@ shinyUI(
        Shiny.onInputChange("releasedKeyId", e.which);
     });')
   )
-);
+)
