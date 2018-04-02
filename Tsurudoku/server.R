@@ -214,24 +214,23 @@ shinyServer(function(input, output, session) {
   lineLineSolver <- function(){
     singleValues <- apply(values$puzzle,c(1,2),
                         function(x){ifelse(length(which(x)) == 1, which(x), 0)});
+    boxLookup <- outer(1:9, 1:9,
+                       function(X,Y){floor((Y-1)/3)*3+floor((X-1)/3)+1});
     for(val in 1:9){
       poss <- which(singleValues == val, arr.ind = TRUE);
-      boxPoss <- floor((poss[,2]-1)/3)*3+floor((poss[,1]-1)/3)+1;
-      nonRow <- which(!(1:9 %in% poss[,1]));
-      nonCol <- which(!(1:9 %in% poss[,2]));
-      boxes <- outer(nonRow, nonCol,
-                     function(X,Y){floor((Y-1)/3)*3+floor((X-1)/3)+1});
-      uniqueBoxes <- which(tabulate(boxes, nbins = 9) == 1);
-      uniqueBoxes <- uniqueBoxes[!uniqueBoxes %in% boxPoss];
-      if(length(uniqueBoxes) > 0){
-        uniquePoss <- which(boxes == uniqueBoxes, arr.ind = TRUE);
-        uniquePoss <- cbind(nonRow[uniquePoss[,1]], nonCol[uniquePoss[,2]]);
-        uniquePoss <- uniquePoss[singleValues[uniquePoss] == 0, , drop=FALSE];
-        if(nrow(uniquePoss) > 0){
-          apply(uniquePoss,1,function(p){
-            flipNumber(p[2],p[1],val);
-          });
-        }
+      boxPoss <- boxLookup;
+      boxPoss[singleValues > 0] <- 0;
+      boxPoss[poss[,1],] <- 0;
+      boxPoss[,poss[,2]] <- 0;
+      for(filledBox in boxLookup[poss]){
+        boxPoss[boxPoss == filledBox] <- 0;
+      }
+      uniqueBoxes <- which(tabulate(boxPoss, nbins = 9) == 1);
+      for(uniqueBox in uniqueBoxes){
+        uniquePoss <- which(boxPoss == uniqueBox, arr.ind = TRUE);
+        apply(uniquePoss,1,function(p){
+          flipNumber(p[2],p[1],val);
+        });
       }
     }
   }
