@@ -33,9 +33,11 @@ shinyServer(function(input, output, session) {
     return(validPuzzle);
   }
   
-  clearBoard <- function(){
+  clearBoard <- function(appendChanges = TRUE){
     values$puzzleBuffer <- values$puzzleHeader;
-    values$puzzleBuffer <- c(values$puzzleBuffer, "## Additional changes");
+    if(appendChanges){
+      values$puzzleBuffer <- c(values$puzzleBuffer, "## Additional changes");
+    }
     values$puzzle <- array(FALSE, c(9,9,9));
     values$locked <- array(FALSE, c(9,9));
   }
@@ -58,7 +60,8 @@ shinyServer(function(input, output, session) {
     if(!grepl("^##",lastLine)){
       posData <- as.numeric(unlist(strsplit(lastLine, "[,; ]")));
       if(length(posData) != 3){
-        showModal(modalDialog("Invalid position information, expecting 'x,y <num>'"));
+        showModal(modalDialog(sprintf(
+          "Invalid position information, expecting 'x,y <num>', got '%s'", lastLine)));
       } else {
         flipNumber(posData[1], posData[2], posData[3]);
       }
@@ -161,12 +164,14 @@ shinyServer(function(input, output, session) {
       showModal(modalDialog("Invalid file format, expecting metadata lines starting with '##'"));
       return(FALSE);
     }
-    chunkPoss <- cbind(head(chunkPoss, -1)+1, tail(chunkPoss, -1)-1);
+    ## check passed, can clear the board now
+    clearBoard(appendChanges = FALSE);
+    chunkPoss <- cbind(head(chunkPoss, -1), tail(chunkPoss, -1)-1);
     chunks <- lapply(1:nrow(chunkPoss), function(x){
-      rlines <- resultData[chunkPoss[x,1]:chunkPoss[x,2]];
+      rlines <- tail(resultData[chunkPoss[x,1]:chunkPoss[x,2]], -1);
       rlines;
       });
-    names(chunks) <- sub("^## ","",resultData[chunkPoss[,1]-1]);
+    names(chunks) <- sub("^## ","",resultData[chunkPoss[,1]]);
     ## Locked positions get special treatment
     if("Locked positions" %in% names(chunks)){
       ## remove graphical elements to leave only grid positions
@@ -191,13 +196,19 @@ shinyServer(function(input, output, session) {
       for(instruction in placeChunk){
         posData <- as.numeric(unlist(strsplit(instruction, "[,; ]")));
         if(length(posData) != 3){
-          showModal(modalDialog("Invalid position information, expecting 'x,y <num>'"));
+          showModal(modalDialog(sprintf(
+            "Invalid position information, expecting 'x,y <num>', got '%s'", instruction)));
           return(FALSE);
         }
         flipNumber(posData[1], posData[2], posData[3]);
       }
     }
     return(TRUE);
+  }
+  
+  resetBoard <- function(){
+    changeBuffer <- values$puzzleBuffer[1:grep("^## Additional changes", values$puzzleBuffer)];
+    loadBoard(changeBuffer);
   }
   
   makeGridPlot <- function(){
@@ -363,13 +374,7 @@ shinyServer(function(input, output, session) {
   });
   
   observeEvent(input$reset, {
-    for(yi in 1:9){
-      for(xi in 1:9){
-        if(!values$locked[yi,xi]){
-          values$puzzle[yi,xi,] = rep(FALSE,9);
-        }
-      }
-    }
+    resetBoard();
   });
   
   observeEvent(input$undo, {
