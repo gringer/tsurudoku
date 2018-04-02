@@ -33,19 +33,23 @@ shinyServer(function(input, output, session) {
     return(validPuzzle);
   }
   
-  flipNumber <- function(numToFlip){
-    if(!any(values$click == c(-1,-1)) && # make sure the selected position is valid 
-       !values$locked[values$click[2],values$click[1]]){ # make sure the position is unlocked
+  clearBoard <- function(){
+    values$puzzleBuffer <- values$puzzleHeader;
+    values$puzzleBuffer <- c(values$puzzleBuffer, "## Additional changes");
+    values$puzzle <- array(FALSE, c(9,9,9));
+    values$locked <- array(FALSE, c(9,9));
+  }
+  
+  flipNumber <- function(px, py, numToFlip){
+    if(!values$locked[py,px]){ # make sure the position is unlocked
       puzzleString <- sprintf("%d,%d %d",
-                              values$click[1], values$click[2], numToFlip);
+                              px, py, numToFlip);
       if(tail(values$puzzleBuffer, 1) == puzzleString){
         values$puzzleBuffer <- head(values$puzzleBuffer, -1);
       } else {
-        print(tail(values$puzzleBuffer));
         values$puzzleBuffer <- c(values$puzzleBuffer, puzzleString);
       }
-      values$puzzle[values$click[2],values$click[1],numToFlip] <-
-        xor(values$puzzle[values$click[2],values$click[1],numToFlip],TRUE);
+      values$puzzle[py,px,numToFlip] <- xor(values$puzzle[py,px,numToFlip],TRUE);
     }
   }
   
@@ -53,7 +57,7 @@ shinyServer(function(input, output, session) {
     if(!any(values$click == c(-1,-1)) && # make sure the selected position is valid 
        !values$locked[values$click[2],values$click[1]]){ # make sure the position is unlocked
       for(ni in which(values$puzzle[values$click[2],values$click[1],])){
-        flipNumber(ni);
+        flipNumber(values$click[1], values$click[2], ni);
       }
     }
   }
@@ -69,6 +73,102 @@ shinyServer(function(input, output, session) {
     } else {
       values$hoverCell[2] <- values$hoverCell[2];
     }
+  }
+  
+  lockBoard <- function(){
+    ## TODO: Ideally this should warn (with confirmation required) that the 
+    ## undo buffer will be reset
+    values$puzzleBuffer <- values$puzzleHeader;
+    ## create an image of the board using ASCII art
+    lineString <- "";
+    values$puzzleBuffer <- c(values$puzzleBuffer, "## Locked positions");
+    for(yi in 1:9){
+      if((yi-1) %% 3 == 0){
+        values$puzzleBuffer <- c(values$puzzleBuffer, 
+                                 sprintf("# +%s", paste(rep("---+",3),collapse="")));
+      }
+      lineString <- "# |";
+      for(xi in 1:9){
+        val <- which(values$puzzle[yi,xi,]);
+        values$locked[yi,xi] <- (length(val) == 1);
+        lineString <- 
+          sprintf("%s%s%s",lineString,
+                  ifelse(length(val) == 1, as.character(val), " "),
+                  ifelse(xi %% 3 == 0, "|", ""));
+      }
+      values$puzzleBuffer <- c(values$puzzleBuffer, lineString);
+    }
+    values$puzzleBuffer <- c(values$puzzleBuffer, 
+                             sprintf("# +%s", paste(rep("---+",3),collapse="")));
+    values$puzzleBuffer <- c(values$puzzleBuffer, "## Additional changes");
+    for(yi in 1:9){
+      for(xi in 1:9){
+        val <- which(values$puzzle[yi,xi,]);
+        if(length(val) > 1){
+          values$puzzleBuffer <- c(values$puzzleBuffer,
+                                   sprintf("%d,%d %d", xi, yi, val));
+        }
+      }
+    }
+  }
+  
+  loadBoard <- function(resultData){
+    versionHeader <- resultData[1];
+    resultData <- tail(resultData, -1);
+    version <- "";
+    if(!grep("^## tsurudoku", versionHeader)){
+      showModal(modalDialog(
+        "Invalid file format, expecting version header line '## tsurudoku ...'"));
+      return(FALSE);
+    } else {
+      version <- sub("^## tsurudoku file format ","",versionHeader);
+      if(version != "v1.0"){
+        showModal(modalDialog(
+          sprintf("Unknown tsurudoku file version '%s'", version)));
+      }
+    }
+    chunkPoss <- c(grep("^##",resultData),length(resultData)+1);
+    if(length(chunkPoss) < 1){
+      showModal(modalDialog("Invalid file format, expecting metadata lines starting with '##'"));
+      return(FALSE);
+    }
+    chunkPoss <- cbind(head(chunkPoss, -1)+1, tail(chunkPoss, -1)-1);
+    chunks <- lapply(1:nrow(chunkPoss), function(x){
+      rlines <- resultData[chunkPoss[x,1]:chunkPoss[x,2]];
+      rlines;
+      });
+    names(chunks) <- sub("^## ","",resultData[chunkPoss[,1]-1]);
+    ## Locked positions get special treatment
+    if("Locked positions" %in% names(chunks)){
+      ## remove graphical elements to leave only grid positions
+      lockLines <- sub("^# ","",chunks$`Locked positions`);
+      lockLines <- lockLines[grep("[0-9 ]",lockLines)];
+      lockLines <- gsub("[^0-9 ]","",lockLines);
+      clearBoard();
+      for(yi in 1:length(lockLines)){
+        lockLine <- as.numeric(unlist(strsplit(lockLines[yi],"")));
+        for(xi in 1:length(lockLine)){
+          if(!is.na(lockLine[xi])){
+            flipNumber(xi, yi, lockLine[xi]);
+          }
+        }
+      }
+      lockBoard();
+    }
+    chunks$`Locked positions` <- NULL;
+    ## Process additional chunks as if they were simple placements
+    ## This allows for things like labelled checkpoints for backtracking
+    for(placeChunk in chunks){
+      for(instruction in placeChunk){
+        posData <- as.numeric(unlist(strsplit(instruction, "[,; ]")));
+        if(length(posData) != 3){
+          showModal(modalDialog("Invalid position information, expecting 'x,y <num>'"));
+          return(FALSE);
+        }
+        flipNumber(posData[1], posData[2], posData[3]);
+      }
+    }
+    return(TRUE);
   }
   
   makeGridPlot <- function(){
@@ -169,7 +269,7 @@ shinyServer(function(input, output, session) {
     content = function(con){
       cat(values$puzzleBuffer, sep="\n", file = con);
     },
-    contentType = "text/txt"
+    contentType = "text/plain"
   );
   
   
@@ -190,7 +290,7 @@ shinyServer(function(input, output, session) {
         hoverNum <- (values$hoverCell[2]-1)*3 + values$hoverCell[1];
         values$numClick <- as.integer(hoverNum);
         values$numFade <- 1.1;
-        flipNumber(values$numClick);
+        flipNumber(values$click[1], values$click[2], values$numClick);
       } else {
         values$click <- newClick;
         if(any((values$click > values$maxPos) | (values$click < 1))){
@@ -212,7 +312,7 @@ shinyServer(function(input, output, session) {
         values$numClick <- -1;
         values$numFade <- 0;
       } else {
-        flipNumber(values$numClick);
+        flipNumber(values$click[1], values$click[2], values$numClick);
       }
       values$hover <- c(-1,-1);
       values$hoverCell <- c(-1,-1);
@@ -222,40 +322,7 @@ shinyServer(function(input, output, session) {
   ## Button listeners
   
   observeEvent(input$lock, {
-    ## TODO: Ideally this should warn (with confirmation required) that the 
-    ## undo buffer will be reset
-    values$puzzleBuffer <- values$puzzleHeader;
-    ## create an image of the board using ASCII art
-    lineString <- "";
-    values$puzzleBuffer <- c(values$puzzleBuffer, "## Locked positions");
-    for(yi in 1:9){
-      if((yi-1) %% 3 == 0){
-        values$puzzleBuffer <- c(values$puzzleBuffer, 
-                                 sprintf("# +%s", paste(rep("---+",3),collapse="")));
-      }
-      lineString <- "# |";
-      for(xi in 1:9){
-        val <- which(values$puzzle[yi,xi,]);
-        values$locked[yi,xi] <- (length(val) == 1);
-        lineString <- 
-          sprintf("%s%s%s",lineString,
-          ifelse(length(val) == 1, as.character(val), " "),
-          ifelse(xi %% 3 == 0, "|", ""));
-      }
-      values$puzzleBuffer <- c(values$puzzleBuffer, lineString);
-    }
-    values$puzzleBuffer <- c(values$puzzleBuffer, 
-                             sprintf("# +%s", paste(rep("---+",3),collapse="")));
-    values$puzzleBuffer <- c(values$puzzleBuffer, "## Additional changes");
-    for(yi in 1:9){
-      for(xi in 1:9){
-        val <- which(values$puzzle[yi,xi,]);
-        if(length(val) > 1){
-          values$puzzleBuffer <- c(values$puzzleBuffer,
-                                   sprintf("%d,%d %d", xi, yi, val));
-        }
-      }
-    }
+    lockBoard();
   });
 
   observeEvent(input$unlock, {
@@ -280,13 +347,22 @@ shinyServer(function(input, output, session) {
     }
   });
   
+  observeEvent(input$sudoku_input.txt, {
+    if(!is.null(input$sudoku_input.txt)){
+      resultData <- readLines(input$sudoku_input.txt$datapath);
+      if(loadBoard(resultData)){
+        showModal(modalDialog(sprintf("%d lines read",length(resultData))));
+      }
+    }
+  });
+  
   ## Key presses
   
   observeEvent(input$pressedKey, {
     if(input$pressedKeyId >= 49 && input$pressedKeyId <= 57){ # numbers
       values$numClick <- (input$pressedKeyId - 48);
       ## values$numFade <- 1.1; # not needed, because number was explicitly pressed
-      flipNumber(values$numClick);
+      flipNumber(values$click[1], values$click[2], values$numClick);
     }
     if(input$pressedKeyId >= 37 && input$pressedKeyId <= 40){ # arrow keys
       arrowCode <- input$pressedKeyId - 37;
@@ -302,8 +378,6 @@ shinyServer(function(input, output, session) {
     if(input$pressedKeyId == 46){ ## delete
       clearSelected();
     }
-    ##values$hover <- c(-1,-1);
-    ##values$hoverCell <- -1;
   });
 
   observeEvent(input$releasedKey, {
