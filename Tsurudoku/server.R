@@ -53,6 +53,18 @@ shinyServer(function(input, output, session) {
     }
   }
   
+  undoMove <- function(){
+    lastLine <- tail(values$puzzleBuffer, 1);
+    if(!grepl("^##",lastLine)){
+      posData <- as.numeric(unlist(strsplit(lastLine, "[,; ]")));
+      if(length(posData) != 3){
+        showModal(modalDialog("Invalid position information, expecting 'x,y <num>'"));
+      } else {
+        flipNumber(posData[1], posData[2], posData[3]);
+      }
+    }
+  }
+  
   clearSelected <- function(){
     if(!any(values$click == c(-1,-1)) && # make sure the selected position is valid 
        !values$locked[values$click[2],values$click[1]]){ # make sure the position is unlocked
@@ -373,7 +385,7 @@ shinyServer(function(input, output, session) {
       }
     }
     if(input$pressedKeyId == 8){ ## backspace
-      clearSelected();
+      undoMove();
     }
     if(input$pressedKeyId == 46){ ## delete
       clearSelected();
