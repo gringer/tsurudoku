@@ -12,6 +12,8 @@ shinyUI(
                    actionButton("unlock", "Unlock all"),
                    actionButton("clear", "Clear selected"),
                    actionButton("reset", "Reset all"),
+                   downloadButton("sudokugrid.txt", "Save puzzle"),
+                   fileInput("sudoku_input.txt", "Load puzzle"),
                    downloadButton("sudokugrid.pdf", label="Make PDF")
       ),
       mainPanel(

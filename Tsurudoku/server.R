@@ -1,12 +1,3 @@
-#
-# This is the server logic of a Shiny web application. You can run the 
-# application by clicking 'Run App' above.
-#
-# Find out more about building applications with Shiny here:
-# 
-#    http://shiny.rstudio.com/
-#
-
 library(shiny)
 
 # Define server logic required to draw a histogram
@@ -20,6 +11,8 @@ shinyServer(function(input, output, session) {
   values$maxPos <- c(9,9);
   values$puzzle <- array(FALSE, c(9,9,9));
   values$locked <- array(FALSE, c(9,9));
+  values$puzzleHeader <- "## tsurudoku file format v1.0";
+  values$puzzleBuffer <- "## tsurudoku file format v1.0";
 
   checkValid <- function(checkPuzzle){
     validPuzzle <- TRUE;
@@ -40,11 +33,28 @@ shinyServer(function(input, output, session) {
     return(validPuzzle);
   }
   
-  flipNumber <- function(){
+  flipNumber <- function(numToFlip){
     if(!any(values$click == c(-1,-1)) && # make sure the selected position is valid 
        !values$locked[values$click[2],values$click[1]]){ # make sure the position is unlocked
-      values$puzzle[values$click[2],values$click[1],values$numClick] <-
-        xor(values$puzzle[values$click[2],values$click[1],values$numClick],TRUE);
+      puzzleString <- sprintf("%d,%d %d",
+                              values$click[1], values$click[2], numToFlip);
+      if(tail(values$puzzleBuffer, 1) == puzzleString){
+        values$puzzleBuffer <- head(values$puzzleBuffer, -1);
+      } else {
+        print(tail(values$puzzleBuffer));
+        values$puzzleBuffer <- c(values$puzzleBuffer, puzzleString);
+      }
+      values$puzzle[values$click[2],values$click[1],numToFlip] <-
+        xor(values$puzzle[values$click[2],values$click[1],numToFlip],TRUE);
+    }
+  }
+  
+  clearSelected <- function(){
+    if(!any(values$click == c(-1,-1)) && # make sure the selected position is valid 
+       !values$locked[values$click[2],values$click[1]]){ # make sure the position is unlocked
+      for(ni in which(values$puzzle[values$click[2],values$click[1],])){
+        flipNumber(ni);
+      }
     }
   }
   
@@ -57,13 +67,13 @@ shinyServer(function(input, output, session) {
       values$hover <- c(-1,-1);
       values$hoverCell <- c(-1,-1);
     } else {
-      values$hoverCell[2] <- 4 - values$hoverCell[2];
+      values$hoverCell[2] <- values$hoverCell[2];
     }
   }
   
   makeGridPlot <- function(){
     par(mar=c(0,0,0,0));
-    plot(NA, xlim=c(0.5,10.5), ylim=c(0.5,10.5), ann=FALSE, axes=FALSE);
+    plot(NA, xlim=c(0.5,10.5), ylim=c(10.5,0.5), ann=FALSE, axes=FALSE);
     segments(x0=1, x1=10, y0=(1:10));
     segments(x0=(1:10), y0=1, y1=10);
     segments(x0=1, x1=10, y0=seq(1, 10, length.out=4), lwd=3);
@@ -74,7 +84,7 @@ shinyServer(function(input, output, session) {
       for(xi in 1:9){
         if(length(which(values$puzzle[yi,xi,])) > 1){
           rect(xleft = rep(boxPos,3)-0.1+xi, xright=rep(boxPos,3)+0.1+xi,
-               ytop = rep(rev(boxPos),each=3)-0.1+yi, ybottom=rep(rev(boxPos),each=3)+0.1+yi,
+               ytop = rep(boxPos,each=3)-0.1+yi, ybottom=rep(boxPos,each=3)+0.1+yi,
                border = NA, col = c(NA,"#0000FF")[values$puzzle[yi,xi,]+1]);
         }
       }
@@ -90,8 +100,8 @@ shinyServer(function(input, output, session) {
     if(all(values$hover >= 0) && all(values$hover == values$click)){
       rect(xleft=values$hover[1] + boxPos[values$hoverCell[1]] - 0.1,
            xright=values$hover[1] + boxPos[values$hoverCell[1]] + 0.1,
-           ytop=values$hover[2] + boxPos[4-values$hoverCell[2]] - 0.1, 
-           ybottom=values$hover[2] + boxPos[4-values$hoverCell[2]] + 0.1,
+           ytop=values$hover[2] + boxPos[values$hoverCell[2]] - 0.1, 
+           ybottom=values$hover[2] + boxPos[values$hoverCell[2]] + 0.1,
            lwd = 3, col = "#A0A02090", border=NA);
     }
     
@@ -108,7 +118,7 @@ shinyServer(function(input, output, session) {
     }
   }
   
-  ## Number display at top of screen
+  ## Number line
   output$numberPlot <- renderPlot({
     par(mar=c(0,0,0,0), lwd=3);
     plot(NA, xlim=c(0.5,10.5), ylim=c(0.5,2.5), ann=FALSE, axes=FALSE);
@@ -116,8 +126,10 @@ shinyServer(function(input, output, session) {
     segments(x0=(1:10), y0=1, y1=2);
     segments(x0=1, x1=10, y0=c(1,2));
     text(x=1:9+0.5, y=1.5, labels=1:9, cex=2, 
-         col = ifelse(1:9 == hoverNum, 
-                      rgb(0.4*(values$clickTimer),0.4*(values$clickTimer),0), 
+         col = ifelse((1:9 == hoverNum) & 
+                        all(values$hover >= 0) & 
+                        all(values$hover == values$click), 
+                      rgb(0.4,0.4,0), 
                       "#000000"));
     if(values$numFade > 0.01){
       rect(xleft=values$numClick,
@@ -147,6 +159,20 @@ shinyServer(function(input, output, session) {
     contentType = "text/pdf"
   );
 
+  ## create text version of Sudoku grid
+  output$sudokugrid.txt <- downloadHandler(
+    filename = function(){
+      fName <- sprintf("tsurudoku_%s.txt",
+                       format(Sys.Date(),"%Y-%b-%d"));
+      return(fName);
+    },
+    content = function(con){
+      cat(values$puzzleBuffer, sep="\n", file = con);
+    },
+    contentType = "text/txt"
+  );
+  
+  
   observeEvent(!is.null(input$grid_hover$x) && floor(c(input$grid_hover$x, input$grid_hover$y)), {
     if(is.null(input$grid_hover$x)){
     } else {
@@ -159,12 +185,12 @@ shinyServer(function(input, output, session) {
   observeEvent(c(input$grid_click$x, input$grid_click$y), {
     if(is.null(input$grid_click$x)){
     } else {
-      newClick <- floor(c(input$grid_click$x, input$grid_click$y));
+      newClick <- as.integer(floor(c(input$grid_click$x, input$grid_click$y)));
       if(all(newClick == values$click)){
         hoverNum <- (values$hoverCell[2]-1)*3 + values$hoverCell[1];
-        values$numClick <- hoverNum;
+        values$numClick <- as.integer(hoverNum);
         values$numFade <- 1.1;
-        flipNumber();
+        flipNumber(values$numClick);
       } else {
         values$click <- newClick;
         if(any((values$click > values$maxPos) | (values$click < 1))){
@@ -186,17 +212,48 @@ shinyServer(function(input, output, session) {
         values$numClick <- -1;
         values$numFade <- 0;
       } else {
-        flipNumber();
+        flipNumber(values$numClick);
       }
       values$hover <- c(-1,-1);
       values$hoverCell <- c(-1,-1);
     }
   });
   
+  ## Button listeners
+  
   observeEvent(input$lock, {
+    ## TODO: Ideally this should warn (with confirmation required) that the 
+    ## undo buffer will be reset
+    values$puzzleBuffer <- values$puzzleHeader;
+    ## create an image of the board using ASCII art
+    lineString <- "";
+    values$puzzleBuffer <- c(values$puzzleBuffer, "## Locked positions");
+    for(yi in 1:9){
+      if((yi-1) %% 3 == 0){
+        values$puzzleBuffer <- c(values$puzzleBuffer, 
+                                 sprintf("# +%s", paste(rep("---+",3),collapse="")));
+      }
+      lineString <- "# |";
+      for(xi in 1:9){
+        val <- which(values$puzzle[yi,xi,]);
+        values$locked[yi,xi] <- (length(val) == 1);
+        lineString <- 
+          sprintf("%s%s%s",lineString,
+          ifelse(length(val) == 1, as.character(val), " "),
+          ifelse(xi %% 3 == 0, "|", ""));
+      }
+      values$puzzleBuffer <- c(values$puzzleBuffer, lineString);
+    }
+    values$puzzleBuffer <- c(values$puzzleBuffer, 
+                             sprintf("# +%s", paste(rep("---+",3),collapse="")));
+    values$puzzleBuffer <- c(values$puzzleBuffer, "## Additional changes");
     for(yi in 1:9){
       for(xi in 1:9){
-        values$locked[yi,xi] <- (length(which(values$puzzle[yi,xi,])) == 1);
+        val <- which(values$puzzle[yi,xi,]);
+        if(length(val) > 1){
+          values$puzzleBuffer <- c(values$puzzleBuffer,
+                                   sprintf("%d,%d %d", xi, yi, val));
+        }
       }
     }
   });
@@ -209,6 +266,10 @@ shinyServer(function(input, output, session) {
     }
   });
 
+  observeEvent(input$clear, {
+    clearSelected();
+  });
+  
   observeEvent(input$reset, {
     for(yi in 1:9){
       for(xi in 1:9){
@@ -224,19 +285,25 @@ shinyServer(function(input, output, session) {
   observeEvent(input$pressedKey, {
     if(input$pressedKeyId >= 49 && input$pressedKeyId <= 57){ # numbers
       values$numClick <- (input$pressedKeyId - 48);
-      values$numFade <- 1.1;
-      flipNumber();
+      ## values$numFade <- 1.1; # not needed, because number was explicitly pressed
+      flipNumber(values$numClick);
     }
     if(input$pressedKeyId >= 37 && input$pressedKeyId <= 40){ # arrow keys
       arrowCode <- input$pressedKeyId - 37;
       xInc <- ((arrowCode+1) %% 2) * (arrowCode - 1);
-      yInc <- ((arrowCode) %% 2) * (arrowCode - 2) * -1;
+      yInc <- ((arrowCode) %% 2) * (arrowCode - 2);
       if(!any(values$click == c(-1,-1))){
         values$click <- (((values$click - 1) + c(xInc, yInc) + 9) %% 9) + 1;
       }
     }
-    values$hover <- c(-1,-1);
-    values$hoverCell <- -1;
+    if(input$pressedKeyId == 8){ ## backspace
+      clearSelected();
+    }
+    if(input$pressedKeyId == 46){ ## delete
+      clearSelected();
+    }
+    ##values$hover <- c(-1,-1);
+    ##values$hoverCell <- -1;
   });
 
   observeEvent(input$releasedKey, {
@@ -244,12 +311,12 @@ shinyServer(function(input, output, session) {
       values$numFade <- 0;
     }
   });
-  # ## Fade timers (causes memory leak)
+  # ## Fade timers (these might cause memory leaks)
   # 
   observe({
     m <- isolate(values$numFade);
     if(m>0.01){
-      values$numFade <- max(m - 0.5, 0);
+      values$numFade <- max(m - 0.25, 0);
       invalidateLater(100, session);
     }
     values$numFade;
