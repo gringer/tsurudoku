@@ -11,6 +11,7 @@ shinyServer(function(input, output, session) {
   values$maxPos <- c(9,9);
   values$puzzle <- array(FALSE, c(9,9,9));
   values$locked <- array(FALSE, c(9,9));
+  values$changes <- FALSE;
   values$puzzleHeader <- "## tsurudoku file format v1.0";
   values$puzzleBuffer <- c("## tsurudoku file format v1.0", "## Additional changes");
 
@@ -52,6 +53,7 @@ shinyServer(function(input, output, session) {
         values$puzzleBuffer <- c(values$puzzleBuffer, puzzleString);
       }
       values$puzzle[py,px,numToFlip] <- xor(values$puzzle[py,px,numToFlip],TRUE);
+      values$changed <- TRUE;
     }
   }
   
@@ -64,6 +66,7 @@ shinyServer(function(input, output, session) {
           "Invalid position information, expecting 'x,y <num>', got '%s'", lastLine)));
       } else {
         flipNumber(posData[1], posData[2], posData[3]);
+        values$click <- posData[1:2];
       }
     }
   }
@@ -211,6 +214,9 @@ shinyServer(function(input, output, session) {
     loadBoard(changeBuffer);
   }
   
+  candidateSolver <- function(){
+  }
+  
   lineLineSolver <- function(){
     singleValues <- apply(values$puzzle,c(1,2),
                         function(x){ifelse(length(which(x)) == 1, which(x), 0)});
@@ -236,8 +242,15 @@ shinyServer(function(input, output, session) {
   }
   
   runSolver <- function(){
-    if("line/line elimination" %in% input$solveLevels){
-      lineLineSolver();
+    values$changed <- TRUE;
+    while(values$changed){
+      values$changed <- FALSE;
+      if("line/line elimination" %in% input$solveLevels){
+        lineLineSolver();
+      }
+      if(!values$changed && "single candidate" %in% input$solveLevels){
+        candidateSolver();
+      }
     }
   }
   
@@ -419,7 +432,7 @@ shinyServer(function(input, output, session) {
     if(!is.null(input$sudoku_input.txt)){
       resultData <- readLines(input$sudoku_input.txt$datapath);
       if(loadBoard(resultData)){
-        showModal(modalDialog(sprintf("%d lines read",length(resultData))));
+        showModal(modalDialog("puzzle loaded successfully"));
       }
     }
   });
@@ -441,7 +454,15 @@ shinyServer(function(input, output, session) {
       }
     }
     if(input$pressedKeyId == 8){ ## backspace
-      undoMove();
+      lastLine <- tail(values$puzzleBuffer, 1);
+      if(!grepl("^##",lastLine)){
+        posData <- as.numeric(unlist(strsplit(lastLine, "[,; ]")));
+        if(all(posData[1:2] == values$click)){
+          undoMove();
+        } else {
+          values$click <- posData[1:2];
+        }
+      }
     }
     if(input$pressedKeyId == 46){ ## delete
       clearSelected();

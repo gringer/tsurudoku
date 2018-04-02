@@ -19,7 +19,8 @@ shinyUI(
         fileInput("sudoku_input.txt", label=NULL, buttonLabel="Load puzzle", 
                   accept = c("text/plain",".txt")),
         checkboxGroupInput("solveLevels", label = "Solve Levels",
-                           choices = list("line/line elimination")),
+                           choices = list("line/line elimination",
+                                          "single candidate")),
         actionButton("solve", "Solve"),
         actionButton("makePuzle", "Make Puzzle")
           
