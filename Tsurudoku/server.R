@@ -1,4 +1,6 @@
-library(shiny)
+# Tsurudoku -- a Shiny implementation of a sudoku puzzle generator / solver
+
+library(shiny);
 
 # Define server logic required to draw a histogram
 shinyServer(function(input, output, session) {
@@ -43,7 +45,7 @@ shinyServer(function(input, output, session) {
     values$locked <- array(FALSE, c(9,9));
   }
   
-  flipNumber <- function(px, py, numToFlip){
+  flipNumber <- function(px, py, numToFlip){ # inverts the logic for a single number
     if(!values$locked[py,px]){ # make sure the position is unlocked
       puzzleString <- sprintf("%d,%d %d",
                               px, py, numToFlip);
@@ -56,6 +58,19 @@ shinyServer(function(input, output, session) {
       values$changed <- TRUE;
     }
   }
+
+  flipAll <- function(px, py){ # inverts the logic for *all* numbers at one location
+    if(!values$locked[py,px]){ # make sure the position is unlocked
+      puzzleString <- sprintf("%d,%d 0", px, py);
+      if(tail(values$puzzleBuffer, 1) == puzzleString){
+        values$puzzleBuffer <- head(values$puzzleBuffer, -1);
+      } else {
+        values$puzzleBuffer <- c(values$puzzleBuffer, puzzleString);
+      }
+      values$puzzle[py,px,] <- xor(values$puzzle[py,px,],TRUE);
+      values$changed <- TRUE;
+    }
+  }
   
   undoMove <- function(){
     lastLine <- tail(values$puzzleBuffer, 1);
@@ -65,7 +80,11 @@ shinyServer(function(input, output, session) {
         showModal(modalDialog(sprintf(
           "Invalid position information, expecting 'x,y <num>', got '%s'", lastLine)));
       } else {
-        flipNumber(posData[1], posData[2], posData[3]);
+        if(posData[3] == 0){
+          flipAll(posData[1], posData[2]);
+        } else {
+          flipNumber(posData[1], posData[2], posData[3]);
+        }
         values$click <- posData[1:2];
       }
     }
@@ -203,7 +222,11 @@ shinyServer(function(input, output, session) {
             "Invalid position information, expecting 'x,y <num>', got '%s'", instruction)));
           return(FALSE);
         }
-        flipNumber(posData[1], posData[2], posData[3]);
+        if(posData[3] == 0){
+          flipAll(posData[1], posData[2]);
+        } else {
+          flipNumber(posData[1], posData[2], posData[3]);
+        }
       }
     }
     return(TRUE);
@@ -215,6 +238,31 @@ shinyServer(function(input, output, session) {
   }
   
   candidateSolver <- function(){
+    singleValues <- apply(values$puzzle,c(1,2),
+                          function(x){ifelse(length(which(x)) == 1, which(x), 0)});
+    singlePoss <- which(singleValues != 0, arr.ind = TRUE);
+    for(spi in seq_len(nrow(singlePoss))){
+      spx <- singlePoss[spi,2];
+      spy <- singlePoss[spi,1];
+      pn <- singleValues[spy, spx];
+      for(px in (1:9)[-spx]){
+        if(all(!values$puzzle[spy,px,])){ # special treatment for blank cells
+          flipAll(px, spy);
+        }
+        print(c(spx, spy, px, pn));
+        if(values$puzzle[spy,px,pn]){
+          flipNumber(px, spy, pn);
+        }
+      }
+      for(py in (1:9)[-spy]){
+        if(all(!values$puzzle[py,spx,])){ # special treatment for blank cells
+          flipAll(spx, py);
+        }
+        if(values$puzzle[py,spx,pn]){
+          flipNumber(spx, py, pn);
+        }
+      }
+    }
   }
   
   lineLineSolver <- function(){
@@ -248,7 +296,7 @@ shinyServer(function(input, output, session) {
       if("line/line elimination" %in% input$solveLevels){
         lineLineSolver();
       }
-      if(!values$changed && "single candidate" %in% input$solveLevels){
+      if(!values$changed && ("single candidate" %in% input$solveLevels)){
         candidateSolver();
       }
     }
@@ -437,13 +485,17 @@ shinyServer(function(input, output, session) {
     }
   });
   
-  ## Key presses
+  ## Key presses, see http://unixpapa.com/js/key.html
   
   observeEvent(input$pressedKey, {
-    if(input$pressedKeyId >= 49 && input$pressedKeyId <= 57){ # numbers
+    if(input$pressedKeyId >= 48 && input$pressedKeyId <= 57){ # numbers
       values$numClick <- (input$pressedKeyId - 48);
       ## values$numFade <- 1.1; # not needed, because number was explicitly pressed
-      flipNumber(values$click[1], values$click[2], values$numClick);
+      if(values$numClick == 0){
+        flipAll(values$click[1], values$click[2]);
+      } else {
+        flipNumber(values$click[1], values$click[2], values$numClick);
+      }
     }
     if(input$pressedKeyId >= 37 && input$pressedKeyId <= 40){ # arrow keys
       arrowCode <- input$pressedKeyId - 37;
