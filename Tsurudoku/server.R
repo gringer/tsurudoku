@@ -87,6 +87,10 @@ shinyServer(function(input, output, session) {
         }
         values$click <- posData[1:2];
       }
+    } else if(lastLine == "## END solve"){ # requested to undo a solve operation
+      changeBuffer <- 
+        head(values$puzzleBuffer, tail(grep("## START solve", values$puzzleBuffer), 1)-1);
+      loadBoard(changeBuffer);
     }
   }
   
@@ -249,7 +253,6 @@ shinyServer(function(input, output, session) {
         if(all(!values$puzzle[spy,px,])){ # special treatment for blank cells
           flipAll(px, spy);
         }
-        print(c(spx, spy, px, pn));
         if(values$puzzle[spy,px,pn]){
           flipNumber(px, spy, pn);
         }
@@ -291,6 +294,7 @@ shinyServer(function(input, output, session) {
   
   runSolver <- function(){
     values$changed <- TRUE;
+    values$puzzleBuffer <- c(values$puzzleBuffer, "## START solve");
     while(values$changed){
       values$changed <- FALSE;
       if("line/line elimination" %in% input$solveLevels){
@@ -299,6 +303,11 @@ shinyServer(function(input, output, session) {
       if(!values$changed && ("single candidate" %in% input$solveLevels)){
         candidateSolver();
       }
+    }
+    if(tail(values$puzzleBuffer,1) == "## START solve"){ # solve did nothing
+      values$puzzleBuffer <- head(values$puzzleBuffer, -1);
+    } else {
+      values$puzzleBuffer <- c(values$puzzleBuffer, "## END solve");
     }
   }
   
