@@ -22,8 +22,9 @@ shinyUI(
                            choices = list("line/line elimination",
                                           "single candidate")),
         actionButton("solve", "Solve"),
-        actionButton("makePuzle", "Make Puzzle")
-          
+        actionButton("makePuzzle", "Make Puzzle"),
+        actionButton("showBuffer", "Show Puzzle Buffer")
+        
       ),
       mainPanel(
         plotOutput("sudokuPlot", hover = hoverOpts("grid_hover", delay=100), 

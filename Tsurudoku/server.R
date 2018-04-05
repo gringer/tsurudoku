@@ -88,6 +88,7 @@ shinyServer(function(input, output, session) {
         values$click <- posData[1:2];
       }
     } else if(lastLine == "## END solve"){ # requested to undo a solve operation
+      print(grep("## START solve", values$puzzleBuffer));
       changeBuffer <- 
         head(values$puzzleBuffer, tail(grep("## START solve", values$puzzleBuffer), 1)-1);
       loadBoard(changeBuffer);
@@ -492,6 +493,10 @@ shinyServer(function(input, output, session) {
         showModal(modalDialog("puzzle loaded successfully"));
       }
     }
+  });
+  
+  observeEvent(input$showBuffer, {
+    showModal(modalDialog(paste(values$puzzleBuffer,collapse="\n")));
   });
   
   ## Key presses, see http://unixpapa.com/js/key.html
