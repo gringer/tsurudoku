@@ -241,6 +241,43 @@ shinyServer(function(input, output, session) {
     loadBoard(changeBuffer);
   }
   
+  singleHiddenSolver <- function(){
+    ## rows
+    zeroes <- apply(values$puzzle, c(1,2), function(x){all(!x)});
+    boxLookup <- outer(1:9, 1:9,
+                       function(X,Y){floor((Y-1)/3)*3+floor((X-1)/3)+1});
+    makeSingle <- function(px, py){
+      if(zeroes[py, px]){
+        flipNumber(px, py, num);
+      } else if(sum(values$puzzle[py,px,])>1){
+        excluded <- values$puzzle[py,px,];
+        excluded[num] <- FALSE;
+        flipNumber(px, py, which(excluded));
+      }
+    }
+    for(num in 1:9){
+      subPuz <- values$puzzle[,,num] | zeroes;
+      for(i in 1:9){
+        if(sum(subPuz[i,]) == 1){ ## column
+          px <- which(subPuz[i,]);
+          py <- i;
+          makeSingle(px, py);
+        }
+        if(sum(subPuz[,i]) == 1){ ## row
+          px <- i;
+          py <- which(subPuz[,i]);
+          makeSingle(px, py);
+        }
+        if(sum(subPuz[boxLookup == i]) == 1){ ## box
+          pxy <- which(subPuz[boxLookup == i]);
+          px <- floor((i-1) / 3) * 3 + floor((pxy-1) / 3) + 1;
+          py <- floor((i-1) %% 3) * 3 + floor((pxy-1) %% 3) + 1;
+          makeSingle(px, py);
+        }
+      }
+    }
+  }
+  
   singleCandidateEliminationSolver <- function(){
     singleValues <- apply(values$puzzle,c(1,2),
                           function(x){ifelse(length(which(x)) == 1, which(x), 0)});
@@ -265,6 +302,7 @@ shinyServer(function(input, output, session) {
           flipNumber(spx, py, pn);
         }
       }
+      ## TODO: eliminate things in the same box
     }
   }
   
@@ -310,6 +348,9 @@ shinyServer(function(input, output, session) {
       }
       if(!values$changed && ("single elimination" %in% input$solveLevels)){
         singleCandidateEliminationSolver();
+      }
+      if(!values$changed && ("single hidden" %in% input$solveLevels)){
+        singleHiddenSolver();
       }
     }
     if(tail(values$puzzleBuffer,1) == "## START solve"){ # solve did nothing
