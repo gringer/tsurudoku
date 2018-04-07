@@ -72,21 +72,25 @@ shinyServer(function(input, output, session) {
     }
   }
   
+  processInstruction(instructionLine){
+    posData <- as.numeric(unlist(strsplit(lastLine, "[,; ]")));
+    if(length(posData) != 3){
+      showModal(modalDialog(sprintf(
+        "Invalid position information, expecting 'x,y <num>', got '%s'", lastLine)));
+    } else {
+      if(posData[3] == 0){
+        flipAll(posData[1], posData[2]);
+      } else {
+        flipNumber(posData[1], posData[2], posData[3]);
+      }
+      values$click <- posData[1:2];
+    }
+  }
+  
   undoMove <- function(){
     lastLine <- tail(values$puzzleBuffer, 1);
     if(!grepl("^##",lastLine)){
-      posData <- as.numeric(unlist(strsplit(lastLine, "[,; ]")));
-      if(length(posData) != 3){
-        showModal(modalDialog(sprintf(
-          "Invalid position information, expecting 'x,y <num>', got '%s'", lastLine)));
-      } else {
-        if(posData[3] == 0){
-          flipAll(posData[1], posData[2]);
-        } else {
-          flipNumber(posData[1], posData[2], posData[3]);
-        }
-        values$click <- posData[1:2];
-      }
+      processInstruction(lastLine);
     } else if(lastLine == "## END solve"){ # requested to undo a solve operation
       print(grep("## START solve", values$puzzleBuffer));
       changeBuffer <- 
@@ -221,17 +225,7 @@ shinyServer(function(input, output, session) {
     ## This allows for things like labelled checkpoints for backtracking
     for(placeChunk in chunks){
       for(instruction in placeChunk){
-        posData <- as.numeric(unlist(strsplit(instruction, "[,; ]")));
-        if(length(posData) != 3){
-          showModal(modalDialog(sprintf(
-            "Invalid position information, expecting 'x,y <num>', got '%s'", instruction)));
-          return(FALSE);
-        }
-        if(posData[3] == 0){
-          flipAll(posData[1], posData[2]);
-        } else {
-          flipNumber(posData[1], posData[2], posData[3]);
-        }
+        processInstruction(instruction);
       }
     }
     return(TRUE);
