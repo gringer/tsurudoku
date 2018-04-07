@@ -92,7 +92,6 @@ shinyServer(function(input, output, session) {
     if(!grepl("^##",lastLine)){
       processInstruction(lastLine);
     } else if(lastLine == "## END solve"){ # requested to undo a solve operation
-      print(grep("## START solve", values$puzzleBuffer));
       changeBuffer <- 
         head(values$puzzleBuffer, tail(grep("## START solve", values$puzzleBuffer), 1)-1);
       loadBoard(changeBuffer);
@@ -226,8 +225,10 @@ shinyServer(function(input, output, session) {
     chunkNames <- names(chunks);
     for(placeChunk in chunks){
       if(length(chunkNames) > 0){
-        values$puzzleBuffer <- c(values$puzzleBuffer, paste0("## ", head(chunkNames, 1)));
-        chunkNames <- tail(chunkNames, -1);
+        if(head(chunkNames, 1) != "Additional changes"){
+          values$puzzleBuffer <- c(values$puzzleBuffer, paste0("## ", head(chunkNames, 1)));
+          chunkNames <- tail(chunkNames, -1);
+        }
       }
       for(instruction in placeChunk){
         processInstruction(instruction);
@@ -420,6 +421,11 @@ shinyServer(function(input, output, session) {
     contentType = "text/plain"
   );
   
+  ## Show the puzzle backend
+  output$puzzleLog <- renderText({
+    paste(values$puzzleBuffer,collapse="\n");
+  });
+  
   
   observeEvent(!is.null(input$grid_hover$x) && floor(c(input$grid_hover$x, input$grid_hover$y)), {
     if(is.null(input$grid_hover$x)){
@@ -503,7 +509,10 @@ shinyServer(function(input, output, session) {
   });
   
   observeEvent(input$showBuffer, {
-    showModal(modalDialog(paste(values$puzzleBuffer,collapse="\n")));
+    showModal(modalDialog(verticalLayout(
+      verbatimTextOutput("puzzleLog") 
+    ),style = "overflow-y:scroll; max-height: 400px")
+    );
   });
   
   ## Key presses, see http://unixpapa.com/js/key.html
