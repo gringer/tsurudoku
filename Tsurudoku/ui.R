@@ -20,7 +20,7 @@ shinyUI(
                   accept = c("text/plain",".txt")),
         checkboxGroupInput("solveLevels", label = "Solve Levels",
                            choices = list("line/line elimination",
-                                          "single candidate")),
+                                          "single elimination")),
         actionButton("solve", "Solve"),
         actionButton("makePuzzle", "Make Puzzle"),
         actionButton("showBuffer", "Show Puzzle Buffer")

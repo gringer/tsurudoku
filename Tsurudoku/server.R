@@ -242,7 +242,7 @@ shinyServer(function(input, output, session) {
     loadBoard(changeBuffer);
   }
   
-  candidateSolver <- function(){
+  singleCandidateEliminationSolver <- function(){
     singleValues <- apply(values$puzzle,c(1,2),
                           function(x){ifelse(length(which(x)) == 1, which(x), 0)});
     singlePoss <- which(singleValues != 0, arr.ind = TRUE);
@@ -287,7 +287,15 @@ shinyServer(function(input, output, session) {
       for(uniqueBox in uniqueBoxes){
         uniquePoss <- which(boxPoss == uniqueBox, arr.ind = TRUE);
         apply(uniquePoss,1,function(p){
-          flipNumber(p[2],p[1],val);
+          if(all(!values$puzzle[p[1],p[2],])){
+            flipNumber(p[2],p[1],val);
+          } else {
+            for(otherVal in which(values$puzzle[p[1],p[2],])){
+              if(otherVal != val){
+                flipNumber(p[2],p[1],otherVal);
+              }
+            }
+          }
         });
       }
     }
@@ -301,8 +309,8 @@ shinyServer(function(input, output, session) {
       if("line/line elimination" %in% input$solveLevels){
         lineLineSolver();
       }
-      if(!values$changed && ("single candidate" %in% input$solveLevels)){
-        candidateSolver();
+      if(!values$changed && ("single elimination" %in% input$solveLevels)){
+        singleCandidateEliminationSolver();
       }
     }
     if(tail(values$puzzleBuffer,1) == "## START solve"){ # solve did nothing
