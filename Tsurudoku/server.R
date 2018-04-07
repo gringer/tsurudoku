@@ -45,16 +45,16 @@ shinyServer(function(input, output, session) {
     values$locked <- array(FALSE, c(9,9));
   }
   
-  flipNumber <- function(px, py, numToFlip){ # inverts the logic for a single number
+  flipNumber <- function(px, py, numsToFlip){ # inverts the logic for specified numbers
     if(!values$locked[py,px]){ # make sure the position is unlocked
-      puzzleString <- sprintf("%d,%d %d",
-                              px, py, numToFlip);
+      puzzleString <- sprintf("%d,%d %s",
+                              px, py, paste(numsToFlip, collapse=";"));
       if(tail(values$puzzleBuffer, 1) == puzzleString){
         values$puzzleBuffer <- head(values$puzzleBuffer, -1);
       } else {
         values$puzzleBuffer <- c(values$puzzleBuffer, puzzleString);
       }
-      values$puzzle[py,px,numToFlip] <- xor(values$puzzle[py,px,numToFlip],TRUE);
+      values$puzzle[py,px,numsToFlip] <- xor(values$puzzle[py,px,numsToFlip],TRUE);
       values$changed <- TRUE;
     }
   }
@@ -72,16 +72,16 @@ shinyServer(function(input, output, session) {
     }
   }
   
-  processInstruction(instructionLine){
-    posData <- as.numeric(unlist(strsplit(lastLine, "[,; ]")));
-    if(length(posData) != 3){
+  processInstruction <- function(instructionLine){
+    posData <- as.numeric(unlist(strsplit(instructionLine, "[,; ]")));
+    if(length(posData) < 3){
       showModal(modalDialog(sprintf(
-        "Invalid position information, expecting 'x,y <num>', got '%s'", lastLine)));
+        "Invalid position information, expecting 'x,y <num>[,num,...]', got '%s'", lastLine)));
     } else {
       if(posData[3] == 0){
         flipAll(posData[1], posData[2]);
       } else {
-        flipNumber(posData[1], posData[2], posData[3]);
+        flipNumber(posData[1], posData[2], posData[-(1:2)]);
       }
       values$click <- posData[1:2];
     }
