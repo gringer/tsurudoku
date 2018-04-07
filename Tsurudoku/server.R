@@ -223,7 +223,12 @@ shinyServer(function(input, output, session) {
     chunks$`Locked positions` <- NULL;
     ## Process additional chunks as if they were simple placements
     ## This allows for things like labelled checkpoints for backtracking
+    chunkNames <- names(chunks);
     for(placeChunk in chunks){
+      if(length(chunkNames) > 0){
+        values$puzzleBuffer <- c(values$puzzleBuffer, paste0("## ", head(chunkNames, 1)));
+        chunkNames <- tail(chunkNames, -1);
+      }
       for(instruction in placeChunk){
         processInstruction(instruction);
       }
