@@ -101,9 +101,8 @@ shinyServer(function(input, output, session) {
   clearSelected <- function(){
     if(!any(values$click == c(-1,-1)) && # make sure the selected position is valid 
        !values$locked[values$click[2],values$click[1]]){ # make sure the position is unlocked
-      for(ni in which(values$puzzle[values$click[2],values$click[1],])){
-        flipNumber(values$click[1], values$click[2], ni);
-      }
+      flipNumber(values$click[1], values$click[2],
+                 which(values$puzzle[values$click[2],values$click[1],]));
     }
   }
   
