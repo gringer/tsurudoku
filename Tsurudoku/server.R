@@ -293,7 +293,7 @@ shinyServer(function(input, output, session) {
       for(idim in 1:3){
         dIndex <- indexLookup[spy, spx, idim];
         dPoss <- data.frame(which(indexLookup[,,idim] == dIndex, arr.ind = TRUE));
-        dPoss <- subset(dPoss, (col != spx || row != spy));
+        dPoss <- subset(dPoss, ((col != spx) | (row != spy)));
         for(di in 1:nrow(dPoss)){
           dx <- dPoss$col[di];
           dy <- dPoss$row[di];
