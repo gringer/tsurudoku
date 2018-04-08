@@ -242,7 +242,6 @@ shinyServer(function(input, output, session) {
   }
   
   singleHiddenSolver <- function(){
-    ## rows
     zeroes <- apply(values$puzzle, c(1,2), function(x){all(!x)});
     boxLookup <- outer(1:9, 1:9,
                        function(X,Y){floor((Y-1)/3)*3+floor((X-1)/3)+1});
@@ -282,27 +281,30 @@ shinyServer(function(input, output, session) {
     singleValues <- apply(values$puzzle,c(1,2),
                           function(x){ifelse(length(which(x)) == 1, which(x), 0)});
     singlePoss <- which(singleValues != 0, arr.ind = TRUE);
+    indexLookup <- 
+      array(c(rep(1:9, 9), # row
+              rep(1:9, each=9), # column
+              outer(1:9, 1:9, function(X,Y){floor((Y-1)/3)*3+floor((X-1)/3)+1})), # box
+            dim=c(9,9,3), dimnames = list(NULL,NULL,c("row","col","box")));
     for(spi in seq_len(nrow(singlePoss))){
       spx <- singlePoss[spi,2];
       spy <- singlePoss[spi,1];
       pn <- singleValues[spy, spx];
-      for(px in (1:9)[-spx]){
-        if(all(!values$puzzle[spy,px,])){ # special treatment for blank cells
-          flipAll(px, spy);
-        }
-        if(values$puzzle[spy,px,pn]){
-          flipNumber(px, spy, pn);
+      for(idim in 1:3){
+        dIndex <- indexLookup[spy, spx, idim];
+        dPoss <- data.frame(which(indexLookup[,,idim] == dIndex, arr.ind = TRUE));
+        dPoss <- subset(dPoss, (col != spx || row != spy));
+        for(di in 1:nrow(dPoss)){
+          dx <- dPoss$col[di];
+          dy <- dPoss$row[di];
+          if(all(!values$puzzle[dy,dx,])){ # special treatment for blank cells
+            flipAll(dx, dy);
+          }
+          if(values$puzzle[dy,dx,pn]){
+            flipNumber(dx, dy, pn);
+          }
         }
       }
-      for(py in (1:9)[-spy]){
-        if(all(!values$puzzle[py,spx,])){ # special treatment for blank cells
-          flipAll(spx, py);
-        }
-        if(values$puzzle[py,spx,pn]){
-          flipNumber(spx, py, pn);
-        }
-      }
-      ## TODO: eliminate things in the same box
     }
   }
   
