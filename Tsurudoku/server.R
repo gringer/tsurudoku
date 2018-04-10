@@ -5,6 +5,7 @@ library(shiny);
 # Define server logic required to draw a histogram
 shinyServer(function(input, output, session) {
   values <- reactiveValues();
+  values$completed <- FALSE;
   values$click <- c(-1,-1);
   values$numClick <- -1;
   values$numFade <- 0;
@@ -37,6 +38,7 @@ shinyServer(function(input, output, session) {
   }
   
   clearBoard <- function(appendChanges = TRUE){
+    values$completed <- FALSE;
     values$puzzleBuffer <- values$puzzleHeader;
     if(appendChanges){
       values$puzzleBuffer <- c(values$puzzleBuffer, "## Additional changes");
@@ -76,7 +78,8 @@ shinyServer(function(input, output, session) {
     posData <- as.numeric(unlist(strsplit(instructionLine, "[,; ]")));
     if(length(posData) < 3){
       showModal(modalDialog(sprintf(
-        "Invalid position information, expecting 'x,y <num>[,num,...]', got '%s'", lastLine)));
+        "Invalid position information, expecting 'x,y <num>[,num,...]', 
+        got '%s'", instructionLine), easyClose = TRUE));
     } else {
       if(posData[3] == 0){
         flipAll(posData[1], posData[2]);
@@ -179,18 +182,20 @@ shinyServer(function(input, output, session) {
     version <- "";
     if(!grep("^## tsurudoku", versionHeader)){
       showModal(modalDialog(
-        "Invalid file format, expecting version header line '## tsurudoku ...'"));
+        "Invalid file format, expecting version header line '## tsurudoku ...'",
+        easyClose = TRUE));
       return(FALSE);
     } else {
       version <- sub("^## tsurudoku file format ","",versionHeader);
       if(version != "v1.0"){
         showModal(modalDialog(
-          sprintf("Unknown tsurudoku file version '%s'", version)));
+          sprintf("Unknown tsurudoku file version '%s'", version), easyClose = TRUE));
       }
     }
     chunkPoss <- c(grep("^##",resultData),length(resultData)+1);
     if(length(chunkPoss) < 1){
-      showModal(modalDialog("Invalid file format, expecting metadata lines starting with '##'"));
+      showModal(modalDialog("Invalid file format, expecting metadata lines starting with '##'"),
+                easyClose = TRUE);
       return(FALSE);
     }
     ## check passed, can clear the board now
@@ -237,25 +242,23 @@ shinyServer(function(input, output, session) {
   }
   
   resetBoard <- function(){
+    values$completed <- FALSE;
     changeBuffer <- values$puzzleBuffer[1:grep("^## Additional changes", values$puzzleBuffer)];
     loadBoard(changeBuffer);
   }
   
   singleHiddenSolver <- function(){
-    zeroes <- apply(values$puzzle, c(1,2), function(x){all(!x)});
     boxLookup <- outer(1:9, 1:9,
                        function(X,Y){floor((Y-1)/3)*3+floor((X-1)/3)+1});
     makeSingle <- function(px, py){
-      if(zeroes[py, px]){
-        flipNumber(px, py, num);
-      } else if(sum(values$puzzle[py,px,])>1){
+      if(sum(values$puzzle[py,px,])>1){
         excluded <- values$puzzle[py,px,];
         excluded[num] <- FALSE;
         flipNumber(px, py, which(excluded));
       }
     }
     for(num in 1:9){
-      subPuz <- values$puzzle[,,num] | zeroes;
+      subPuz <- values$puzzle[,,num];
       for(i in 1:9){
         if(sum(subPuz[i,]) == 1){ ## column
           px <- which(subPuz[i,]);
@@ -297,9 +300,6 @@ shinyServer(function(input, output, session) {
         for(di in 1:nrow(dPoss)){
           dx <- dPoss$col[di];
           dy <- dPoss$row[di];
-          if(all(!values$puzzle[dy,dx,])){ # special treatment for blank cells
-            flipAll(dx, dy);
-          }
           if(values$puzzle[dy,dx,pn]){
             flipNumber(dx, dy, pn);
           }
@@ -340,9 +340,18 @@ shinyServer(function(input, output, session) {
     }
   }
   
+  flipZeroes <- function(){
+    zeroValues <- which(apply(values$puzzle,c(1,2),
+                          function(x){all(!x)}), arr.ind = TRUE);
+    for(spi in seq_len(nrow(zeroValues))){
+      flipAll(zeroValues[spi,2], zeroValues[spi,1]);
+    }
+  }
+  
   runSolver <- function(){
     values$changed <- TRUE;
     values$puzzleBuffer <- c(values$puzzleBuffer, "## START solve");
+    flipZeroes(); # this means solvers don't have to worry about the meaning of zero candidates
     while(values$changed){
       values$changed <- FALSE;
       if("line/line elimination" %in% input$solveLevels){
@@ -406,6 +415,10 @@ shinyServer(function(input, output, session) {
     if(!checkValid(values$puzzle)){
       rect(xleft = 1, xright = 10, ytop=10, ybottom=1,
            col = "#A0600060", border=NA);
+    }
+    if(all(textValues != "") && !values$completed){
+      values$completed <- TRUE;
+      showModal(modalDialog("Puzzle has been solved!", easyClose = TRUE));
     }
   }
   
@@ -545,7 +558,7 @@ shinyServer(function(input, output, session) {
     if(!is.null(input$sudoku_input.txt)){
       resultData <- readLines(input$sudoku_input.txt$datapath);
       if(loadBoard(resultData)){
-        showModal(modalDialog("puzzle loaded successfully"));
+        showModal(modalDialog("puzzle loaded successfully", easyClose = TRUE));
       }
     }
   });
@@ -553,7 +566,7 @@ shinyServer(function(input, output, session) {
   observeEvent(input$showBuffer, {
     showModal(modalDialog(verticalLayout(
       verbatimTextOutput("puzzleLog") 
-    ),style = "overflow-y:scroll; max-height: 400px")
+    ),style = "overflow-y:scroll; max-height: 400px", easyClose = TRUE)
     );
   });
   
